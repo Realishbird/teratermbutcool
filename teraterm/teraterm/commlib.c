@@ -54,6 +54,7 @@
 
 #include "commlib.h"
 #include "session.h"
+#include "dbglog.h"
 
 /* create socket */
 static SOCKET OpenSocket(PComVar cv)
@@ -297,6 +298,16 @@ void CommOpen(HWND HW, PTTSet ts, PComVar cv)
 	cv->Open = FALSE;
 	cv->PortType = ts->PortType;
 	cv->ComPort = 0;
+	if (ts->PortType == IdSerial) {
+		DbgLog("comm: open COM%d %u baud (session %p)", ts->ComPort, (unsigned)ts->Baud, SessionGetActive());
+	}
+	else if (ts->PortType == IdTCPIP) {
+		DbgLog("comm: open %s port %d telnet=%d (session %p)", ts->HostName, ts->TCPPort, ts->Telnet, SessionGetActive());
+	}
+	else {
+		DbgLog("comm: open port type %d (session %p)", ts->PortType, SessionGetActive());
+	}
+
 	cv->RetryCount = 0;
 	cv->RetryWithOtherProtocol = TRUE;
 	cv->s = INVALID_SOCKET;
@@ -567,6 +578,7 @@ void CommOpen(HWND HW, PTTSet ts, PComVar cv)
 
 BreakSC:
 	if (InvalidHost) {
+		DbgLog("comm: open failed (session %p)", SessionGetActive());
 		PostMessage(cv->HWin, WM_USER_COMMNOTIFY, 0, FD_CLOSE);
 		if ( (ts->PortType==IdTCPIP) && cv->Open ) {
 			if ( cv->s!=INVALID_SOCKET ) {
@@ -793,6 +805,7 @@ void CommClose(PComVar cv)
 		return;
 	}
 	cv->Open = FALSE;
+	DbgLog("comm: close (session %p)", SessionGetActive());
 
 	/* disable event message posting & flush buffer */
 	cv->RRQ = FALSE;

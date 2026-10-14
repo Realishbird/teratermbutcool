@@ -33,11 +33,14 @@
 
 #include "ttwinman.h"
 #include "session.h"
+#include "ttplug.h"
+#include "dbglog.h"
 
 struct TTSession {
 	TTTSet *ts;
 	TComVar *cv;
 	unsigned char *state;	// saved module variables
+	BOOL static_tscv;		// ts / cv are the static ones in ttwinman.c
 };
 
 #define MAX_VARS 512
@@ -48,7 +51,26 @@ static size_t state_size;
 static unsigned char *default_state;	// initial values of module variables
 
 static TTSession *active;
+static TTSession **sessions;
 static int session_count;
+
+static void AddToList(TTSession *s)
+{
+	sessions = (TTSession **)realloc(sessions, sizeof(TTSession *) * (session_count + 1));
+	sessions[session_count++] = s;
+}
+
+static void RemoveFromList(TTSession *s)
+{
+	for (int i = 0; i < session_count; i++) {
+		if (sessions[i] == s) {
+			memmove(&sessions[i], &sessions[i + 1], sizeof(TTSession *) * (session_count - i - 1));
+			session_count--;
+			return;
+		}
+	}
+	assert(FALSE);
+}
 
 // modules with per session state
 void VTTermRegisterSessionVars(void);
@@ -62,6 +84,8 @@ void FileSysRegisterSessionVars(void);
 void FileSysProtoRegisterSessionVars(void);
 void SendMemRegisterSessionVars(void);
 void VTWinRegisterSessionVars(void);
+void WinsockRegisterSessionVars(void);
+void FileIORegisterSessionVars(void);
 
 void SessionRegisterVars(const SessionVar *v, size_t count)
 {
@@ -108,6 +132,8 @@ void SessionInit(void)
 	FileSysProtoRegisterSessionVars();
 	SendMemRegisterSessionVars();
 	VTWinRegisterSessionVars();
+	WinsockRegisterSessionVars();
+	FileIORegisterSessionVars();
 
 	default_state = (unsigned char *)malloc(state_size);
 	SaveVars(default_state);
@@ -117,8 +143,10 @@ void SessionInit(void)
 	first->cv = g_cv;
 	first->state = (unsigned char *)malloc(state_size);
 	memcpy(first->state, default_state, state_size);
+	first->static_tscv = TRUE;
 	active = first;
-	session_count = 1;
+	AddToList(first);
+	DbgLog("session %p created (first), %u bytes of state per session", first, (unsigned)state_size);
 }
 
 /**
@@ -132,7 +160,8 @@ TTSession *SessionCreate(void)
 	s->cv = (TComVar *)calloc(1, sizeof(TComVar));
 	s->state = (unsigned char *)malloc(state_size);
 	memcpy(s->state, default_state, state_size);
-	session_count++;
+	AddToList(s);
+	DbgLog("session %p created (%d sessions)", s, session_count);
 	return s;
 }
 
@@ -144,11 +173,15 @@ TTSession *SessionCreate(void)
 void SessionDestroy(TTSession *s)
 {
 	assert(s != active);
+	DbgLog("session %p destroyed", s);
+	TTXSessionEnd(s);
+	RemoveFromList(s);
 	free(s->state);
-	free(s->ts);
-	free(s->cv);
+	if (!s->static_tscv) {
+		free(s->ts);
+		free(s->cv);
+	}
 	free(s);
-	session_count--;
 }
 
 void SessionSwitch(TTSession *s)
@@ -162,6 +195,8 @@ void SessionSwitch(TTSession *s)
 	g_ts = s->ts;
 	g_cv = s->cv;
 	active = s;
+	// plugins with per session state (ttssh2)
+	TTXSessionSwitch(s, s->ts, s->cv);
 }
 
 TTSession *SessionGetActive(void)
@@ -172,6 +207,34 @@ TTSession *SessionGetActive(void)
 int SessionGetCount(void)
 {
 	return session_count;
+}
+
+TTSession *SessionGetAt(int index)
+{
+	if (index < 0 || index >= session_count) {
+		return NULL;
+	}
+	return sessions[index];
+}
+
+/**
+ *	TRUE for the first session
+ *	TTX plugins (ttssh2 ...) were initialized with its settings and
+ *	connection, they work only for it
+ */
+BOOL SessionIsPluginSession(TTSession *s)
+{
+	return s->static_tscv;
+}
+
+TTTSet *SessionGetTS(TTSession *s)
+{
+	return s->ts;
+}
+
+TComVar *SessionGetCV(TTSession *s)
+{
+	return s->cv;
 }
 
 TTSession *SessionEnter(TTSession *s)

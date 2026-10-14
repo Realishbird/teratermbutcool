@@ -85,6 +85,10 @@ add_executable(
   darkmode.h
   session.c
   session.h
+  frame.cpp
+  frame.h
+  dbglog.c
+  dbglog.h
   winjump.c
   winjump.h
 )

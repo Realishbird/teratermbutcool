@@ -304,6 +304,10 @@
 #define ID_FILE_REPLAYLOG               50171
 #define ID_FILE_PRINT2                  50180
 #define ID_FILE_EXPORTBUFFER            50181
+#define ID_FILE_NEWTAB                  50113
+#define ID_FILE_CLOSETAB                50114
+#define ID_TAB_NEXT                     50115
+#define ID_TAB_PREV                     50116
 #define ID_FILE_DISCONNECT              50190
 #define ID_FILE_EXIT                    50199
 #define ID_FILE_EXITALL                 50200
@@ -341,6 +345,7 @@
 #define ID_CONTROL_SHOW_MACRO           50480
 #define ID_HELP_INDEX2                  50910
 #define ID_HELP_ABOUT                   50990
+#define ID_HELP_DEBUGFOLDER             50991
 #define ID_TEKFILE_PRINT                51110
 #define ID_TEKFILE_EXIT                 51190
 #define ID_TEKEDIT_COPY                 51210
